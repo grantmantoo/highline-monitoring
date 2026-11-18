@@ -1,0 +1,181 @@
+{
+  "cameras": [
+    {
+      "id": "upstairs_hallway",
+      "label": "Upstairs Hallway",
+      "ip": "192.168.1.100",
+      "username": "admin",
+      "password": "CHANGE_ME",
+      "rtsp_path": "/h264Preview_01_main",
+      "rtsp_port": 8080,
+      "http_port": 80,
+      "enabled": true,
+      "_comment": "Copy this file to config.json and fill in your real camera IP and credentials. config.json is gitignored and must never be committed."
+    }
+  ],
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8090,
+    "_comment": "The viewer has NO authentication. Bind localhost and reach it over the tailnet with \"tailscale serve --bg 8090\". Setting host to 0.0.0.0 exposes a live video feed of the home to every device on the LAN, guests and IoT included."
+  },
+  "status": {
+    "enabled": false,
+    "ha_url": "http://127.0.0.1:8123",
+    "refresh_seconds": 10,
+    "_comment": "Device status blocks shown above the camera feed. Home Assistant is queried SERVER-SIDE using HA_TOKEN or ~/.ha_token; the token never reaches the browser. Each tile: label, entity, optional states map, alert_when (raw states to highlight), or suffix/alert_below for numbers.",
+    "tiles": [
+      {
+        "label": "Front Door",
+        "entity": "binary_sensor.front_door",
+        "states": {
+          "on": "Open",
+          "off": "Closed"
+        },
+        "alert_when": [
+          "on"
+        ]
+      },
+      {
+        "label": "Deadbolt",
+        "entity": "lock.front_door",
+        "states": {
+          "locked": "Locked",
+          "unlocked": "Unlocked"
+        },
+        "alert_when": [
+          "unlocked"
+        ]
+      },
+      {
+        "label": "Lock Jam",
+        "entity": "binary_sensor.front_door_lock_jammed",
+        "states": {
+          "on": "JAMMED",
+          "off": "OK"
+        },
+        "alert_when": [
+          "on"
+        ],
+        "_comment": "Worth its own tile. A jammed deadbolt reports lock state as \"unknown\", which reads like a glitch rather than a fault: on 2026-09-01 a BE469ZP jammed at 23:50 and sat that way for 13 hours with the dashboard showing a grey \"unknown\" box. Usually strike-plate misalignment."
+      },
+      {
+        "label": "Lock Battery",
+        "entity": "sensor.front_door_battery_level",
+        "suffix": "%",
+        "alert_below": 20
+      },
+      {
+        "label": "Intrusion",
+        "entity": "binary_sensor.front_door_intrusion",
+        "states": {
+          "on": "ALARM",
+          "off": "Clear"
+        },
+        "alert_when": [
+          "on"
+        ]
+      }
+    ]
+  },
+  "climate": {
+    "enabled": false,
+    "refresh_seconds": 15,
+    "unit": "°F",
+    "stale_after_seconds": 3600,
+    "_comment": "Thermostat card above the camera feed. HA is queried SERVER-SIDE; the token never reaches the browser, and the endpoint is read-only. ha_url is optional and defaults to the status block's. Thresholds are in whatever unit HA reports (Settings > System > General) -- no conversion is done. The primary room sensor is the headline number ON PURPOSE: an ecobee can average any sensor participating in the active comfort setting, so the climate entity may read comfortable while a bedroom is cold, and it rounds to a whole degree where the sensor does not. stale_after_seconds guards a known HomeKit failure where a reading freezes at its last value while the entity still looks healthy. Occupancy is deliberately not read; bedroom presence is a separate family decision. Any source may override stale_after_seconds (null disables it for that source): HA only bumps last_updated when a value changes, and a climate entity's values (a whole degree, a humidity point, the HVAC state) legitimately sit still for hours, and even a room sensor only reports on change (an ecobee SmartSensor was seen silent for 32 minutes), so the thermostat gets a much longer window and the room window is an hour.",
+    "thermostat": {
+      "entity": "climate.CHANGE_ME",
+      "label": "Thermostat",
+      "stale_after_seconds": 14400
+    },
+    "rooms": [
+      {
+        "label": "CHANGE_ME",
+        "entity": "sensor.CHANGE_ME_temperature",
+        "primary": true,
+        "alert_below": 62,
+        "alert_above": 82
+      }
+    ]
+  },
+  "recording": {
+    "clip_dir": "clips",
+    "pre_motion_seconds": 5,
+    "post_motion_seconds": 5,
+    "segment_seconds": 2,
+    "motion_cooldown_seconds": 30,
+    "retention_days": 30,
+    "_comment": "Clips older than retention_days are deleted by an hourly sweep. Capture is otherwise unbounded (~2.5GB/day observed). 0 disables pruning. Age comes from the filename timestamp, mtime as fallback."
+  },
+  "detection": {
+    "model": "yolo11m.pt",
+    "imgsz": 1280,
+    "device": "auto",
+    "confidence": 0.3,
+    "frame_skip": 5,
+    "classes": [
+      "person",
+      "car",
+      "truck",
+      "motorcycle",
+      "bicycle",
+      "dog",
+      "cat"
+    ]
+  },
+  "webhook_url": "",
+  "zones": {
+    "enabled": true,
+    "log_file": "presence.jsonl",
+    "vanish_seconds": 3.0,
+    "exit_zone": "Living/Dining",
+    "transit_zone": "Hallway",
+    "_comment": "Only the two doorways are detected -- both are close-range and reliable. Anything else resolves by elimination to exit_zone. Polygons are normalized 0-1 coords measured from walk-throughs; re-verify with: python zone_check.py --detect",
+    "regions": [
+      {
+        "name": "Bedroom",
+        "type": "doorway",
+        "polygon": [
+          [
+            0.05,
+            0.88
+          ],
+          [
+            0.33,
+            0.88
+          ],
+          [
+            0.33,
+            1.0
+          ],
+          [
+            0.05,
+            1.0
+          ]
+        ]
+      },
+      {
+        "name": "Bathroom",
+        "type": "doorway",
+        "polygon": [
+          [
+            0.44,
+            0.64
+          ],
+          [
+            0.59,
+            0.64
+          ],
+          [
+            0.59,
+            0.82
+          ],
+          [
+            0.44,
+            0.82
+          ]
+        ]
+      }
+    ]
+  }
+}

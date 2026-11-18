@@ -1,0 +1,3 @@
+# Real HA transport (HAClient REST + WebSocket). The simulator + tests need no
+# third-party packages -- aiohttp is imported lazily, only when talking to a live HA.
+aiohttp>=3.9.0

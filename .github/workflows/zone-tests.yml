@@ -1,0 +1,65 @@
+name: Zone tests
+
+# Guards the camera zone state machine: which room someone moved into, derived
+# from where they were last seen before leaving frame. The logic is subtle
+# enough (walking past a door must not read as walking through it) that a
+# regression would be silent -- the system would keep running and just log the
+# wrong room.
+#
+# Deliberately does NOT install opencv/ultralytics/torch. zones.py and
+# test_zones.py are stdlib only, so this runs in seconds. If a future change
+# makes this job need pip install, that is a signal the tracker has picked up a
+# heavyweight dependency it probably should not have.
+#
+# config.json is gitignored (it holds camera credentials), so on a clean
+# checkout test_zones.py falls back to config.example.json. That means CI is
+# validating the polygons we actually ship to a new install.
+#
+# Also guards the temperature card (climate_status.py behind /api/climate):
+# which reading is the headline, when a room is in alert, and when a reading
+# is too old to show. Tested against fake HA payloads. climate_status imports
+# aiohttp lazily so this job stays stdlib-only; if that import ever moves to
+# module scope, this job breaks, which is the intended signal.
+
+on:
+  push:
+    paths:
+      - 'devices/cameras/**'
+      - '.github/workflows/zone-tests.yml'
+  pull_request:
+    paths:
+      - 'devices/cameras/**'
+      - '.github/workflows/zone-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  test-zones:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the documented floor in devices/cameras/SETUP.md.
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Confirm no config.json leaked into the repo
+        run: |
+          if git ls-files --error-unmatch devices/cameras/config.json >/dev/null 2>&1; then
+            echo "::error::devices/cameras/config.json is tracked; it holds camera credentials and must stay ignored"
+            exit 1
+          fi
+          echo "config.json is untracked, as expected"
+
+      - name: Run zone state machine tests
+        working-directory: devices/cameras
+        run: python test_zones.py
+
+      - name: Run climate card tests
+        working-directory: devices/cameras
+        run: python test_climate_status.py

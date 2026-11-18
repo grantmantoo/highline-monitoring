@@ -1,0 +1,9 @@
+# Never commit real per-install config or credentials
+house.yaml
+devices/cameras/config.json
+*.env
+.env
+__pycache__/
+*.pyc
+# Model weights (download separately)
+*.pt

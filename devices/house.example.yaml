@@ -1,0 +1,91 @@
+# Highline Tech -- example house config
+# =====================================
+# One install's wiring: which device monitors run, and the REAL Home Assistant
+# entity ids / areas they watch. devices/run.py loads this, starts a monitor for
+# each enabled device against one shared HA connection, and routes every alert
+# through the unified notifier. Devices that aren't present are simply omitted (or
+# enabled: false) -- they are never started.
+#
+# Copy to house.yaml and edit the entity ids to match your HA. The `config` block
+# under each device is passed straight to that monitor's constructor.
+
+notify:
+  webhook_url: ""        # POST target for notifications; empty = log/record only
+  min_level: info        # info | warning | critical -- drop anything below this
+
+devices:
+  # --- the water auto-shutoff pair (cross-device chain) --------------------
+  - type: zooz-valve-actuator
+    area: Water Main
+    config:
+      switch: switch.water_main_valve
+      temp: sensor.water_main_valve_temperature
+      leak: binary_sensor.water_main_valve_leak
+
+  - type: aqara-water-leak
+    area: Whole House
+    config:
+      valve_switch: switch.water_main_valve   # leak here closes that valve
+      low_battery_pct: 15
+
+  # --- climate / safety ---------------------------------------------------
+  - type: honeywell-t6-thermostat
+    area: Living Room
+    config:
+      entity: climate.living_room
+
+  - type: aqara-temp-humidity
+    area: Whole House
+    config:
+      # Only these room sensors are watched. Without a roster ClimateMonitor would
+      # also grab non-room temperature entities (e.g. sensor.water_main_valve_temperature)
+      # and misreport the freezing water main as a cold "room".
+      rooms: [bedroom, living_room, kitchen, bathroom]
+
+  - type: aqara-door-window
+    area: Whole House
+    config:
+      climate_entity: climate.living_room     # for the open-while-heating check
+      warn_seconds: 600
+      # Openings are auto-discovered by device_class, which also picks up any
+      # lock that ships its own door-position sensor. A Schlage BE469ZP exposes
+      # binary_sensor.<lock>_current_status_of_the_door with device_class "door";
+      # it depends on strike alignment and was observed reporting OPEN
+      # continuously on a shut door that already had a real contact on it.
+      # Unfiltered that raises opening_left_open forever. Exclude it.
+      exclude:
+        - binary_sensor.touchscreen_deadbolt_z_wave_plus_current_status_of_the_door
+
+  # --- elder-care presence ------------------------------------------------
+  - type: aqara-fp1e-presence
+    area: Whole House
+    config:
+      concern_rooms: [bathroom]
+      no_activity_seconds: 21600              # 6 h wellness window
+      linger_seconds: 1800                    # 30 min bathroom-fall heuristic
+
+  # --- energy / activity --------------------------------------------------
+  - type: thirdrealm-smart-plugs
+    area: Kitchen
+    config:
+      routine_plugs: [coffee_maker]
+
+  # --- infrastructure health ----------------------------------------------
+  - type: sonoff-zigbee-dongle
+    area: Network
+    config:
+      mass_threshold: 3
+
+  - type: netgear-poe-switch
+    area: Network
+    config:
+      roster: [camera.front_door, camera.driveway, camera.porch, camera.back_yard]
+
+  - type: reolink-camera-bundle
+    area: Exterior
+    config:
+      cooldown: 30
+
+  # Passive-hardware diagnostics are run on demand, not by the runner:
+  #   cat6-cabling     -> python cat6-cabling/linkcheck.py <inventory.json>
+  #   ainope-usb-ext   -> python ainope-usb-extension/placement.py  (AINOPE_LQI_ENTITIES)
